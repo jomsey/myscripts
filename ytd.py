@@ -7,10 +7,11 @@ from pytube.exceptions import RegexMatchError,VideoUnavailable
 from urllib.error import URLError
 from clipboard import paste
 from win10toast  import ToastNotifier
-# from progress.bar import ShadyBar
-# from progress.spinner import Spinner
-import os
-import math
+from progress.bar import ShadyBar
+from progress.spinner import Spinner
+from threading import Thread
+import os,math,time
+
 
 
 class YoutubeVideo:
@@ -24,8 +25,11 @@ class YoutubeVideo:
         
         if video_link.startswith("https:") and video_link != "":
             url = video_link
-        self.yt = YouTube(url)      
-    
+            self.yt = YouTube(url)
+            
+        else:
+            print(f" {url} is an invalid url")   
+        
     
     def get_video(self):
         """
@@ -37,7 +41,6 @@ class YoutubeVideo:
         yt_video = self.yt.streams.get_highest_resolution()
         return yt_video
     
-     
     def print_video(self):
         video = self.get_video()
         video_size = math.floor(video.filesize/1049600)
@@ -60,10 +63,10 @@ class YoutubeVideo:
                 {border}
                     SIZE:         {video_size} MB
                 {border}
-                                                              DESCRIPTION
-                                                              ____________
-                   
-                      {self.yt.description[:500].center(100)}  
+                DESCRIPTION
+             ____________
+                
+                      {self.yt.description[:500]}  
               """)
         print()
                    
@@ -71,6 +74,10 @@ class YoutubeVideo:
         print("downloading video----")
         directory = self.download_directory()
         self.get_video().download(output_path=directory,max_retries=30)
+        #################################
+       
+        #################################
+        print("download complete")
         #display notification when download is complete
         self.toast.show_toast("Video download","Download complete",duration=60)
        
@@ -81,11 +88,10 @@ class YoutubeVideo:
         print("downloading audio ---")
         directory = self.download_directory()
         audio= self.yt.streams.get_audio_only()
-        audio.download(output_path=directory)
-        
+        audio.download(output_path=directory,max_retries=30)
         self.rename_to_mp3(audio)
-        self.get_video().download(output_path=directory,max_retries=30)
         #display notification when download is complete
+        print("download complete")
         self.toast.show_toast("Audio download","Download complete",duration=60)
     
         
@@ -128,29 +134,32 @@ class YoutubeVideo:
         """
         
         directory=os.path.join(os.getcwd(),"YTDownloader")
-        
         if not os.path.exists(directory):
-            os.mkdir(directory)  
-             
+            os.mkdir(directory)    
         return directory
     
-    # def work_progress(self,style,message,state=""):
-    #     work_state = "done"
-    #     if style == "spin":
-    #         spinner = Spinner(message)
-    #         while work_state != state:
-    #             spinner.next()
-    #         spinner.finish()
+    def get_downloading_file(self):
+        os.chdir(self.download_directory())
+        for file in os.listdir(os.getcwd()):
+            if os.path.isfile(file):
+                if file == self.get_video().title:
+                    size = os.path.getsize(file)
+        return size
+               
+                    
+    
+    def work_progress(self,style,message,state=""):
+        work_state = "done"
+        if style == "spin":
+            spinner = Spinner(message)
+            while work_state != state:
+                spinner.next()
+            spinner.finish()
         
-    #     if style == "bar":
-    #         with ShadyBar(message,max=100) as bar:
-    #             for x in range(100):
-    #                 bar.next()
-        
-    #     if style == "bar":
-    #         with ShadyBar(message,max=100) as bar:
-    #             for x in range(100):
-    #                 bar.next()
+        if style == "bar":
+            with ShadyBar(message,max=math.floor(self.get_video().filesize/1049600)) as bar:
+                for x in range(self.get_video().filesize):
+                    bar.next()
               
 try:
     yt = YoutubeVideo()
@@ -161,15 +170,18 @@ try:
     print(" Collecting video infomation ------")
     yt.print_video()
     
+    
     while True:
        try:
            choice = int(input(" Enter 1 to download video or 2 for audio: "))
            print()
-          
            if choice == 1:
                yt.download_video()
-           if choice == 2:
-               yt.download_audio()
+           elif choice == 2:
+              #Thread(target= yt.work_progress('bar','downloading'))
+              Thread(target= yt.download_audio())
+              
+               
            else:
                print("Invalid command")
        except ValueError:
@@ -190,3 +202,6 @@ except (RegexMatchError,
                      >Poor internet connection
                      >Video may be not available
           """)
+except KeyboardInterrupt:
+    print()
+    print("Program Ended")
