@@ -1,34 +1,27 @@
 """
 Author:Muwanguzi Joseph
 Project:Youtube Downloader
-Description:
+Description: Simple script to download youtube videos,search youtube videos also get audio from the videos
 """
 from pytube import YouTube,Search
 from pytube.exceptions import RegexMatchError,VideoUnavailable
-from urllib.error import URLError
-from clipboard import paste
 from win10toast  import ToastNotifier
 # from progress.bar import ShadyBar
 # from progress.spinner import Spinner
 import os
 import math
 
-class SearchVideo:
-    pass
+
+      
 class YoutubeVideo:
     def __init__(self) :
         commands=["cls","color 9"]
-        video_link = paste()
-        url = ""
-        self.toast = ToastNotifier()
-        
-        
+        self.url=None
+       
         for c in commands:
             os.system(c)
             
-        if video_link.startswith("https:") and video_link != "":
-            url = video_link
-        self.yt = YouTube(url) 
+      
             
     def get_video(self):
         """
@@ -36,7 +29,7 @@ class YoutubeVideo:
         Returns:
             stream with highest resolution
         """
-        yt_video = self.yt.streams.get_highest_resolution()
+        yt_video = YouTube(self.url).streams.get_highest_resolution()
         return yt_video
     
     def _get_video_duration(self):
@@ -49,6 +42,10 @@ class YoutubeVideo:
      
         
     def video_info(self):
+        print()
+        print(" Collecting video information ------")
+         
+         
         video = self.get_video()
         video_size = math.floor(video.filesize/1049600)
         title= video.title
@@ -66,8 +63,9 @@ class YoutubeVideo:
     def download_complete(self):
          """
          notify when download is complete
-         """    
-         self.toast.show_toast("Audio download","Download complete",duration=60)
+         """  
+         toast = ToastNotifier()
+         return toast.show_toast("Audio download","Download complete",duration=60)
                    
     def download_video(self):
         print("downloading video----")
@@ -81,8 +79,8 @@ class YoutubeVideo:
          get audio formats from the youtube video downloads
         """
         print("downloading audio ---")
-        
-        audio= self.yt.streams.get_audio_only()
+
+        audio= YouTube(self.url).streams.get_audio_only()
         directory = self.download_directory("audio")
         audio.download(max_retries=3,output_path=directory)
         
@@ -90,14 +88,33 @@ class YoutubeVideo:
         self.rename_to_mp3(audio)
         self.download_complete()
     
-        
+    
+    def show_search_results(self,results):
+        print("\n                    SEARCH RESULTS\n")
+        for index,video in enumerate(results):
+            print(f"     [ {index} ] ---- {video.title}")
+        print("")
+            
+
+    def search_video(self,query,choice=None):
+        """
+        search youtube video and return search video url for the selected
+        """
+        search =  Search(query)
+        results =  search.results
+        return results
+    
+    def get_search_video_url(self,results,choice):
+        for item in results:
+            if choice:
+                index = results.index(item)
+                if index == choice:
+                    return results[index].watch_url #url of chosen video
+            
     def rename_to_mp3(self,file):
         """
         Replaces mp4 video extension on the downloaded audio file to mp3.
         Removes undesired naming on the video like "official video "
-
-        Args:
-            file (str): Audio file to be renamed
         """
     
         new_audio_name = file.default_filename.removesuffix('.mp4')+".mp3"
@@ -154,37 +171,68 @@ class YoutubeVideo:
     #             for x in range(100):
     #                 bar.next()
               
-try:
-    yt = YoutubeVideo()
-    print("                                     YOUTUBE DOWNLOADER")
-    print()
-    print(" Note:This script automatically  gets the copied url\n Make sure to copy link before starting\n")
-    print(" Collecting video information ------")
-    print(yt.video_info())
+if __name__ == "__main__":
+     try:
+         
+         
+         yt = YoutubeVideo()
+         
+         def down_video_or_audio():
+             print("""
+                   Enter
+                        "V" to download video
+                         "A" to download audio
+                   """)
+             choice = input("  >>>>> ").upper()
+             if choice == "V":
+                 yt.download_video()
+                 print("Done")
+             elif choice == "A":
+                  yt.download_audio()
+                  print("Done")
+         
+         print("                                     YOUTUBE DOWNLOADER")
+        
     
-
-    
-    while True:
-           choice = input(' Enter "V" to download video or \n"A" for audio or any other key to Quit >> ').upper()
-           print()
-           if choice == "V":
-               yt.download_video()
-           elif choice == "A":
-               yt.download_audio()
-           else:
-              break
-    
-    print(" PROGRAM EXITED")
-    
-
-except (
-        VideoUnavailable,RegexMatchError,URLError
+         while True:
+             print(''' Enter  
+                           "Video URL
+                           "S" to search for video ''')
+             
+             
+             choice = input(">>>> ")
+                 
+             if choice == "S":
+                 query = input("Search >> ")
+                 videos=yt.search_video(query)
+                 yt.show_search_results(videos) #print results
+                 
+                 try:
+                     print("Enter the Index of Video to download")
+                     index = int(input(">>>> "))
+                     video_url=str(yt.get_search_video_url(videos,choice=index))
+                     yt.url=video_url
+                     print(video_url)
+                     down_video_or_audio()
+                 except ValueError:
+                     print("Only Integer Inputs Accepted")
+             else:
+                 try:
+                    yt.url = choice.strip()
+                    down_video_or_audio()
+                 except RegexMatchError:
+                    print("You Entered an Invalid URL") 
+            
+     except (
+        VideoUnavailable
         ):
-    print("""
+         print("""
             ERROR- Something is wrong
-                  
+            
                 Possible causes
-                     >Invalid video url copied
+                     >Invalid video url 
                      >Poor internet connection
                      >Video may be not available
           """)
+
+    
